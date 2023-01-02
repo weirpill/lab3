@@ -1,0 +1,76 @@
+
+#include <avr/io.h>
+#define F_CPU 4000000
+#include <util/delay.h>
+#include <avr/interrupt.h>
+
+
+void Delay500ms(void)  
+{
+	
+	TCNT1 = 0;										//Set TCNT1 value
+	OCR1A = 0x7A11;									//Load OCR1A value
+	TCCR1B = (1<<WGM12) | (1<<CS11) | (1<<CS10);	//CTC mode with prescaler 64	
+	TCCR1A = 0;
+	
+	while ((TIFR&(1<<OCF1A)) == 0);					//Wait until OCF1A set when TCNT1 = OCR1A
+
+	TIFR = 0x10;									//clear OCF1A
+}
+
+
+ISR (INT0_vect) //Interrupt INT0 function
+{
+	uint8_t led[] = {0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F}; //Common Cathode LED blinking pattern
+	
+	for(uint8_t i=0; i<8; i++)
+	{
+		PORTA = ~led[i]; //Common Anode LED blinking pattern output
+		Delay500ms();
+	}
+	GICR = 0X00;
+	//cli();
+}
+
+
+ISR (INT1_vect) //Interrupt INT1 function
+{
+	uint8_t b[ ] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, //Common Cathode LED blinking pattern
+	0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0};
+	
+	for (uint8_t i=0; i<15; i++)
+	{
+		PORTA = ~b[i]; //Common Anode LED blinking pattern output
+		Delay500ms();
+	}
+	GICR = 0X00;
+	//cli();
+}
+
+int main(void)
+{
+	DDRA = 0xFF;			//Set PORTA as output
+	DDRB = 0xFF;			//Set PORTB as output
+	DDRD = 0b11110011;		// Set PIN 2 and 3 of PORTD as input
+	PORTD = 0b00001100;		//Enable pull up resistor of input pin (default input 1)
+	
+	GICR = 0xC0;			//Enable INT0 and INT1
+	MCUCR = 0x0A;			//Falling edge trigger options for INT0 and INT1
+	sei ();					//Enable interrupt globally
+	
+	while (1)
+	{
+		uint8_t mynum[ ] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F}; //Common Cathode 7 segment output for 0-9
+		
+		for (uint8_t i=0; i<10; i++)
+		{
+			//sei();
+			GICR = 0xC0;
+			PORTA = 0xFF;			//LED off
+			PORTB = ~mynum[i];		//Common Anode 7 segment output to PORTB
+			Delay500ms();
+			Delay500ms();
+		}
+	}
+}
+
